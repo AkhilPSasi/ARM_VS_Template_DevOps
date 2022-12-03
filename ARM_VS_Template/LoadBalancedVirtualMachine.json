@@ -1,92 +1,25 @@
 {
   "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
   "contentVersion": "1.0.0.0",
-  "parameters": {
-    "projectName": {
-      "type": "string",
-      "defaultValue": "Duke",
-      "metadata": {
-        "description": "Specifies a project name that is used for generating resource names."
-      }
-    },
-    "adminUsername": {
-      "type": "string",
-      "minLength": 1,
-      "metadata": {
-        "description": "Admin username"
-      }
-    },
-    "adminPassword": {
-      "type": "securestring",
-      "metadata": {
-        "description": "Admin password"
-      }
-    },
-    "imageSKU": {
-      "type": "string",
-      "defaultValue": "2012-R2-Datacenter",
-      "allowedValues": [
-        "2008-R2-SP1",
-        "2012-Datacenter",
-        "2012-R2-Datacenter"
-      ],
-      "metadata": {
-        "description": "The Windows version for the VM"
-      }
-    },
-    "vmSize": {
-      "type": "string",
-      "minLength": 1,
-      "defaultValue": "Standard_D2_v2",
-      "allowedValues": [
-        "Basic_A0",
-        "Basic_A1",
-        "Basic_A2",
-        "Basic_A3",
-        "Basic_A4",
-        "Standard_A0",
-        "Standard_A1",
-        "Standard_A2",
-        "Standard_A3",
-        "Standard_A4",
-        "Standard_A5",
-        "Standard_A6",
-        "Standard_A7",
-        "Standard_D1_v2",
-        "Standard_D2_v2",
-        "Standard_D3_v2",
-        "Standard_D4_v2",
-        "Standard_D11_v2",
-        "Standard_D12_v2",
-        "Standard_D13_v2",
-        "Standard_D14_v2"
-      ],
-      "metadata": {
-        "description": "Size of the virtual machine, must be available in the virtual machine's location"
-      }
-    },
-    "numberOfInstances": {
-      "type": "int",
-      "minValue": 1,
-      "defaultValue": 2,
-      "metadata": {
-        "description": "Number of VM instances to be created behind internal load balancer control"
-      }
-    }
-  },
   "variables": {
-    "vmNamePrefix": "[format('{0}_Vm', parameters('projectName'))]",
-    "publicIPAddressNamePrefix": "[format('{0}_Ip', parameters('projectName'))]",
-    "vNetName": "[format('{0}_vnet', parameters('projectName'))]",
+    "projectName": "Duke",
+    "adminUsername": "akhilone",
+    "adminPassword": "Akhil@1234567",
+    "imageSKU": "2012-R2-Datacenter",
+    "vmSize": "Standard_D2_v2",
+    "numberOfInstances": "1",
+    "vmNamePrefix": "[format('{0}_Vm', variables('projectName'))]",
+    "publicIPAddressNamePrefix": "[format('{0}_Ip', variables('projectName'))]",
+    "vNetName": "[format('{0}_vnet', variables('projectName'))]",
     "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', variables('vNetName'))]",
     "vNetSubnetName": "BackendSubnet",
     "subnetRef": "[concat(variables('vnetId'), '/subnets/', variables('vNetSubnetName'))]",
 
     //"vNetAGSubnetName": "AGSubnet",
     //"AGsubnetRef": "[concat(variables('vnetId'), '/subnets/', variables('vNetAGSubnetName'))]",
-    //"AGPublicIpAddressNamePrefix": "[format('{0}_AG_Ip', parameters('projectName'))]",
+    //"AGPublicIpAddressNamePrefix": "[format('{0}_AG_Ip', variables('projectName'))]",
 
-    //"vNetName2": "[format('{0}_vnet2', parameters('projectName'))]",
+    //"vNetName2": "[format('{0}_vnet2', variables('projectName'))]",
     //"vnetId2": "[resourceId('Microsoft.Network/virtualNetworks', variables('vNetName2'))]",
     //"vNetSubnetName2": "BackendSubnet",
     //"subnetRef2": "[concat(variables('vnetId2'), '/subnets/', variables('vNetSubnetName2'))]",
@@ -94,26 +27,26 @@
     "imagePublisher": "MicrosoftWindowsServer",
     "imageOffer": "WindowsServer",
     "vhdStorageType": "Standard_LRS",
-    "vhdStorageAccountName": "[format('vhd{0}{1}', toLower(parameters('projectName')),uniqueString(resourceGroup().id))]",
-    "networkInterfaceNamePrefix": "[format('{0}_NIC', parameters('projectName'))]",
+    "vhdStorageAccountName": "[format('vhd{0}{1}', toLower(variables('projectName')),uniqueString(resourceGroup().id))]",
+    "networkInterfaceNamePrefix": "[format('{0}_NIC', variables('projectName'))]",
 
-    "loadBalancerNamePrefix": "[format('{0}_LB', parameters('projectName'))]",
+    "loadBalancerNamePrefix": "[format('{0}_LB', variables('projectName'))]",
     "loadBalancerId": "[resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerNamePrefix'))]",
-    "lbPublicIpAddressNamePrefix": "[format('{0}_LB_Ip', parameters('projectName'))]",
+    "lbPublicIpAddressNamePrefix": "[format('{0}_LB_Ip', variables('projectName'))]",
     "SkuName": "Standard",
-    "networkSecurityGroupNamePrefix": "[format('{0}_NSG', parameters('projectName'))]",
+    "networkSecurityGroupNamePrefix": "[format('{0}_NSG', variables('projectName'))]",
     "publicIPAddressType": "Static"
 
-    //"routeTableNamePrefix": "[format('{0}-routeTable', parameters('projectName'))]",
-    //"routeName": "[format('{0}_route1', parameters('projectName'))]",
+    //"routeTableNamePrefix": "[format('{0}-routeTable', variables('projectName'))]",
+    //"routeName": "[format('{0}_route1', variables('projectName'))]",
 
-    //"vNetPeeringOneTwo": "[format('{0}_OneTwo', parameters('projectName'))]",
-    //"vNetPeeringTwoOne": "[format('{0}_TwoOne', parameters('projectName'))]",
+    //"vNetPeeringOneTwo": "[format('{0}_OneTwo', variables('projectName'))]",
+    //"vNetPeeringTwoOne": "[format('{0}_TwoOne', variables('projectName'))]",
 
-    //"TrafficManagerNamePrefix": "[format('{0}-TrafficManager1-{1}', parameters('projectName'),uniqueString(resourceGroup().id))]",
-    //"TrafficManagerDnsPrefix": "[format('{0}DNS', parameters('projectName'))]",
+    //"TrafficManagerNamePrefix": "[format('{0}-TrafficManager1-{1}', variables('projectName'),uniqueString(resourceGroup().id))]",
+    //"TrafficManagerDnsPrefix": "[format('{0}DNS', variables('projectName'))]",
 
-    //"applicationGateWayName": "[format('{0}_AG', parameters('projectName'))]",
+    //"applicationGateWayName": "[format('{0}_AG', variables('projectName'))]",
     //"applicationGateWayIPConfigName": "[format('{0}_IpConfig',variables('applicationGateWayName'))]",
     //"applicationGatewayPublicFrontendIp": "[format('{0}_PublicIp',variables('applicationGateWayName'))]",
     //"applicationGateWayBackendPool": "[format('{0}_BackendPool',variables('applicationGateWayName'))]",
@@ -122,27 +55,27 @@
     //"applicationGateWayRoutingRule": "[format('{0}_RoutingRule',variables('applicationGateWayName'))]",
     //"applicationGateWayPort_80": "[format('{0}_Port80',variables('applicationGateWayName'))]",
 
-    //"appServicePlanName": "[format('{0}-appserviceplan-{1}',parameters('projectName'),uniqueString(resourceGroup().id))]",
-    //"appServiceWebAppName": "[format('{0}-webapp-{1}',parameters('projectName'),uniqueString(resourceGroup().id))]",
-    //"appServiceWebApiName": "[format('{0}-webapi-{1}',parameters('projectName'),uniqueString(resourceGroup().id))]",
+    //"appServicePlanName": "[format('{0}-appserviceplan-{1}',variables('projectName'),uniqueString(resourceGroup().id))]",
+    //"appServiceWebAppName": "[format('{0}-webapp-{1}',variables('projectName'),uniqueString(resourceGroup().id))]",
+    //"appServiceWebApiName": "[format('{0}-webapi-{1}',variables('projectName'),uniqueString(resourceGroup().id))]",
     //"appServiceWebAppRepoUrl": "https://github.com/AkhilPSasi/Akhil_CoreWebApp.git",
     //"appServiceWebApiRepoUrl": "https://github.com/AkhilPSasi/Akhil_API.git",
 
     //"corsUrl": "[toLower(concat('https://',variables('appServiceWebApiName'),'.azurewebsites.net'))]",
 
-    //"SqlserverName": "[format('{0}{1}', parameters('projectName'),uniqueString('sql',resourceGroup().id))]",
-    //"SqlDBNamePrefix": "[concat('/DB',format('{0}',parameters('projectName')))]",
+    //"SqlserverName": "[format('{0}{1}', variables('projectName'),uniqueString('sql',resourceGroup().id))]",
+    //"SqlDBNamePrefix": "[concat('/DB',format('{0}',variables('projectName')))]",
     //"SqlDBName": "[format('{0}{1}', variables('SqlserverName'), variables('SqlDBNamePrefix'))]",
     //"SqlDBFirewallRule": "[format('{0}{1}', variables('SqlserverName'), '/FirewallRule')]",
     //"SqladministratorLogin": "akhilpsasi",
     //"SqladministratorPassword": "Akhil@12345",
 
-    //"CosmosAccountName": "[format('{0}cosmos{1}', parameters('projectName'),uniqueString('sql',resourceGroup().id))]",
-    //"CosmosDBNamePrefix": "[toLower(concat('DB',format('{0}',parameters('projectName'))))]",
+    //"CosmosAccountName": "[format('{0}cosmos{1}', variables('projectName'),uniqueString('sql',resourceGroup().id))]",
+    //"CosmosDBNamePrefix": "[toLower(concat('DB',format('{0}',variables('projectName'))))]",
     //"CosmosDatabaseName": "[format('{0}/{1}', toLower(variables('CosmosAccountName')), variables('CosmosDBNamePrefix'))]",
     //"CosmosContainerNamePrefix": "[toLower('ContainerOne')]",
     //"CosmosContainerName": "[format('{0}/{1}/{2}', toLower(variables('CosmosAccountName')), variables('CosmosDBNamePrefix'),variables('CosmosContainerNamePrefix'))]",
-    
+
   },
   "resources": [
     {
@@ -424,7 +357,7 @@
         "publicIPAddressVersion": "IPv4",
         "publicIPAllocationMethod": "Static",
         "dnsSettings": {
-          "domainNameLabel": "[toLower(format('{0}{1}', format('{0}Vm', parameters('projectName')), uniqueString(resourceGroup().id)))]"
+          "domainNameLabel": "[toLower(format('{0}{1}', format('{0}Vm', variables('projectName')), uniqueString(resourceGroup().id)))]"
         }
       }
     },
@@ -440,7 +373,7 @@
     //    "publicIPAddressVersion": "IPv4",
     //    "publicIPAllocationMethod": "Static",
     //    "dnsSettings": {
-    //      "domainNameLabel": "[toLower(format('{0}{1}', format('{0}AG', parameters('projectName')), uniqueString(resourceGroup().id)))]"
+    //      "domainNameLabel": "[toLower(format('{0}{1}', format('{0}AG', variables('projectName')), uniqueString(resourceGroup().id)))]"
     //    }
     //  }
     //},
@@ -462,18 +395,18 @@
       ],
       "properties": {
         "hardwareProfile": {
-          "vmSize": "[parameters('vmSize')]"
+          "vmSize": "[variables('vmSize')]"
         },
         "osProfile": {
-          "computerName": "[format('{0}-vm{1}', parameters('projectName'), range(1, 1)[copyIndex()])]",
-          "adminUsername": "[parameters('adminUsername')]",
-          "adminPassword": "[parameters('adminPassword')]"
+          "computerName": "[format('{0}-vm{1}', variables('projectName'), range(1, 1)[copyIndex()])]",
+          "adminUsername": "[variables('adminUsername')]",
+          "adminPassword": "[variables('adminPassword')]"
         },
         "storageProfile": {
           "imageReference": {
             "publisher": "[variables('imagePublisher')]",
             "offer": "[variables('imageOffer')]",
-            "sku": "[parameters('imageSKU')]",
+            "sku": "[variables('imageSKU')]",
             "version": "latest"
           },
           "osDisk": {

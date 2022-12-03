@@ -2,17 +2,5 @@
   "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
   "contentVersion": "1.0.0.0",
   "parameters": {
-    "adminUsername": {
-      "value": "akhilone"
-    },
-    "adminPassword": {
-      "value": "Akhil@1234567"
-    },
-    "numberOfInstances": {
-      "value": 1
-    }
-    //"dnsNameForPublicIPone": {
-    //  "value": "akhilpsasidns"
-    //}
   }
 }
