@@ -1,0 +1,974 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "projectName": {
+      "type": "string",
+      "defaultValue": "Duke",
+      "metadata": {
+        "description": "Specifies a project name that is used for generating resource names."
+      }
+    },
+    "adminUsername": {
+      "type": "string",
+      "minLength": 1,
+      "metadata": {
+        "description": "Admin username"
+      }
+    },
+    "adminPassword": {
+      "type": "securestring",
+      "metadata": {
+        "description": "Admin password"
+      }
+    },
+    "imageSKU": {
+      "type": "string",
+      "defaultValue": "2012-R2-Datacenter",
+      "allowedValues": [
+        "2008-R2-SP1",
+        "2012-Datacenter",
+        "2012-R2-Datacenter"
+      ],
+      "metadata": {
+        "description": "The Windows version for the VM"
+      }
+    },
+    "vmSize": {
+      "type": "string",
+      "minLength": 1,
+      "defaultValue": "Standard_D2_v2",
+      "allowedValues": [
+        "Basic_A0",
+        "Basic_A1",
+        "Basic_A2",
+        "Basic_A3",
+        "Basic_A4",
+        "Standard_A0",
+        "Standard_A1",
+        "Standard_A2",
+        "Standard_A3",
+        "Standard_A4",
+        "Standard_A5",
+        "Standard_A6",
+        "Standard_A7",
+        "Standard_D1_v2",
+        "Standard_D2_v2",
+        "Standard_D3_v2",
+        "Standard_D4_v2",
+        "Standard_D11_v2",
+        "Standard_D12_v2",
+        "Standard_D13_v2",
+        "Standard_D14_v2"
+      ],
+      "metadata": {
+        "description": "Size of the virtual machine, must be available in the virtual machine's location"
+      }
+    },
+    "numberOfInstances": {
+      "type": "int",
+      "minValue": 1,
+      "defaultValue": 2,
+      "metadata": {
+        "description": "Number of VM instances to be created behind internal load balancer control"
+      }
+    }
+  },
+  "variables": {
+    "vmNamePrefix": "[format('{0}_Vm', parameters('projectName'))]",
+    "publicIPAddressNamePrefix": "[format('{0}_Ip', parameters('projectName'))]",
+    "vNetName": "[format('{0}_vnet', parameters('projectName'))]",
+    "vnetId": "[resourceId('Microsoft.Network/virtualNetworks', variables('vNetName'))]",
+    "vNetSubnetName": "BackendSubnet",
+    "subnetRef": "[concat(variables('vnetId'), '/subnets/', variables('vNetSubnetName'))]",
+
+    //"vNetAGSubnetName": "AGSubnet",
+    //"AGsubnetRef": "[concat(variables('vnetId'), '/subnets/', variables('vNetAGSubnetName'))]",
+    //"AGPublicIpAddressNamePrefix": "[format('{0}_AG_Ip', parameters('projectName'))]",
+
+    //"vNetName2": "[format('{0}_vnet2', parameters('projectName'))]",
+    //"vnetId2": "[resourceId('Microsoft.Network/virtualNetworks', variables('vNetName2'))]",
+    //"vNetSubnetName2": "BackendSubnet",
+    //"subnetRef2": "[concat(variables('vnetId2'), '/subnets/', variables('vNetSubnetName2'))]",
+
+    "imagePublisher": "MicrosoftWindowsServer",
+    "imageOffer": "WindowsServer",
+    "vhdStorageType": "Standard_LRS",
+    "vhdStorageAccountName": "[format('vhd{0}{1}', toLower(parameters('projectName')),uniqueString(resourceGroup().id))]",
+    "networkInterfaceNamePrefix": "[format('{0}_NIC', parameters('projectName'))]",
+
+    "loadBalancerNamePrefix": "[format('{0}_LB', parameters('projectName'))]",
+    "loadBalancerId": "[resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerNamePrefix'))]",
+    "lbPublicIpAddressNamePrefix": "[format('{0}_LB_Ip', parameters('projectName'))]",
+    "SkuName": "Standard",
+    "networkSecurityGroupNamePrefix": "[format('{0}_NSG', parameters('projectName'))]",
+    "publicIPAddressType": "Static"
+
+    //"routeTableNamePrefix": "[format('{0}-routeTable', parameters('projectName'))]",
+    //"routeName": "[format('{0}_route1', parameters('projectName'))]",
+
+    //"vNetPeeringOneTwo": "[format('{0}_OneTwo', parameters('projectName'))]",
+    //"vNetPeeringTwoOne": "[format('{0}_TwoOne', parameters('projectName'))]",
+
+    //"TrafficManagerNamePrefix": "[format('{0}-TrafficManager1-{1}', parameters('projectName'),uniqueString(resourceGroup().id))]",
+    //"TrafficManagerDnsPrefix": "[format('{0}DNS', parameters('projectName'))]",
+
+    //"applicationGateWayName": "[format('{0}_AG', parameters('projectName'))]",
+    //"applicationGateWayIPConfigName": "[format('{0}_IpConfig',variables('applicationGateWayName'))]",
+    //"applicationGatewayPublicFrontendIp": "[format('{0}_PublicIp',variables('applicationGateWayName'))]",
+    //"applicationGateWayBackendPool": "[format('{0}_BackendPool',variables('applicationGateWayName'))]",
+    //"applicationGateWayHttpSetting": "[format('{0}_HttpSetting',variables('applicationGateWayName'))]",
+    //"applicationGateWayHttpListener": "[format('{0}_HttpListner',variables('applicationGateWayName'))]",
+    //"applicationGateWayRoutingRule": "[format('{0}_RoutingRule',variables('applicationGateWayName'))]",
+    //"applicationGateWayPort_80": "[format('{0}_Port80',variables('applicationGateWayName'))]",
+
+    //"appServicePlanName": "[format('{0}-appserviceplan-{1}',parameters('projectName'),uniqueString(resourceGroup().id))]",
+    //"appServiceWebAppName": "[format('{0}-webapp-{1}',parameters('projectName'),uniqueString(resourceGroup().id))]",
+    //"appServiceWebApiName": "[format('{0}-webapi-{1}',parameters('projectName'),uniqueString(resourceGroup().id))]",
+    //"appServiceWebAppRepoUrl": "https://github.com/AkhilPSasi/Akhil_CoreWebApp.git",
+    //"appServiceWebApiRepoUrl": "https://github.com/AkhilPSasi/Akhil_API.git",
+
+    //"corsUrl": "[toLower(concat('https://',variables('appServiceWebApiName'),'.azurewebsites.net'))]",
+
+    //"SqlserverName": "[format('{0}{1}', parameters('projectName'),uniqueString('sql',resourceGroup().id))]",
+    //"SqlDBNamePrefix": "[concat('/DB',format('{0}',parameters('projectName')))]",
+    //"SqlDBName": "[format('{0}{1}', variables('SqlserverName'), variables('SqlDBNamePrefix'))]",
+    //"SqlDBFirewallRule": "[format('{0}{1}', variables('SqlserverName'), '/FirewallRule')]",
+    //"SqladministratorLogin": "akhilpsasi",
+    //"SqladministratorPassword": "Akhil@12345",
+
+    //"CosmosAccountName": "[format('{0}cosmos{1}', parameters('projectName'),uniqueString('sql',resourceGroup().id))]",
+    //"CosmosDBNamePrefix": "[toLower(concat('DB',format('{0}',parameters('projectName'))))]",
+    //"CosmosDatabaseName": "[format('{0}/{1}', toLower(variables('CosmosAccountName')), variables('CosmosDBNamePrefix'))]",
+    //"CosmosContainerNamePrefix": "[toLower('ContainerOne')]",
+    //"CosmosContainerName": "[format('{0}/{1}/{2}', toLower(variables('CosmosAccountName')), variables('CosmosDBNamePrefix'),variables('CosmosContainerNamePrefix'))]",
+    
+  },
+  "resources": [
+    {
+      "apiVersion": "2016-01-01",
+      "type": "Microsoft.Storage/storageAccounts",
+      "name": "[variables('vhdStorageAccountName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "StorageAccount"
+      },
+      "sku": {
+        "name": "[variables('vhdStorageType')]"
+      },
+      "kind": "Storage"
+    },
+    {
+      "type": "Microsoft.Network/networkSecurityGroups",
+      "apiVersion": "2021-02-01",
+      "name": "[variables('networkSecurityGroupNamePrefix')]",
+      "location": "[resourceGroup().location]",
+      "properties": {
+        "securityRules": [
+          {
+            "name": "rdp-rule",
+            "properties": {
+              "description": "Allow RDP",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "3389",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 100,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "web-rule",
+            "properties": {
+              "description": "Allow WEB",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "80",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 101,
+              "direction": "Inbound"
+            }
+          },
+          {
+            "name": "web-rule2",
+            "properties": {
+              "description": "Allow WEB 2",
+              "protocol": "Tcp",
+              "sourcePortRange": "*",
+              "destinationPortRange": "65200-65535",
+              "sourceAddressPrefix": "Internet",
+              "destinationAddressPrefix": "*",
+              "access": "Allow",
+              "priority": 102,
+              "direction": "Inbound"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "2016-03-30",
+      "type": "Microsoft.Network/virtualNetworks",
+      "name": "[variables('vNetName')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VirtualNetwork"
+      },
+      "properties": {
+        "addressSpace": {
+          "addressPrefixes": [
+            "10.0.0.0/16"
+          ]
+        },
+        "subnets": [
+          {
+            "name": "[variables('vNetSubnetName')]",
+            "properties": {
+              "addressPrefix": "10.0.2.0/24",
+              "networkSecurityGroup": {
+                "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupNamePrefix'))]"
+              }
+            }
+            //"routeTable": {
+            //  "id": "[resourceId('Microsoft.Network/routeTables', variables('routeTableNamePrefix'))]"
+            //}
+          }
+          //{
+          //  "name": "[variables('vNetAGSubnetName')]",
+          //  "properties": {
+          //    "addressPrefix": "10.0.3.0/24",
+          //    "networkSecurityGroup": {
+          //      "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupNamePrefix'))]"
+          //    }
+          //  }
+          //}
+        ]
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupNamePrefix'))]"
+      ]
+    },
+    //{
+    //  "apiVersion": "2016-03-30",
+    //  "type": "Microsoft.Network/virtualNetworks",
+    //  "name": "[variables('vNetName2')]",
+    //  "location": "[resourceGroup().location]",
+    //  "tags": {
+    //    "displayName": "VirtualNetwork2"
+    //  },
+    //  "properties": {
+    //    "addressSpace": {
+    //      "addressPrefixes": [
+    //        "10.2.0.0/16"
+    //      ]
+    //    },
+    //    "subnets": [
+    //      {
+    //        "name": "[variables('vNetSubnetName2')]",
+    //        "properties": {
+    //          "addressPrefix": "10.2.1.0/24",
+    //          "networkSecurityGroup": {
+    //            "id": "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupNamePrefix'))]"
+    //          }
+    //        }
+    //      }
+    //    ]
+    //  },
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Network/networkSecurityGroups', variables('networkSecurityGroupNamePrefix'))]"
+    //  ]
+    //},
+    {
+      "copy": {
+        "name": "networkInterface_collection",
+        "count": "[length(range(0, 1))]"
+      },
+      "apiVersion": "2016-03-30",
+      "type": "Microsoft.Network/networkInterfaces",
+      "name": "[format('{0}{1}', variables('networkInterfaceNamePrefix'), add(range(0, 1)[copyIndex()], 1))]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "NetworkInterface"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}{1}', variables('publicIPAddressNamePrefix'), range(1, 1)[copyIndex()]))]",
+        "[resourceId('Microsoft.Network/virtualNetworks/', variables('vNetName'))]",
+        "[resourceId('Microsoft.Network/loadBalancers/', variables('loadBalancerNamePrefix'))]"
+        //"[resourceId('Microsoft.Network/applicationGateways', variables('applicationGateWayName'))]"
+      ],
+      "properties": {
+        "ipConfigurations": [
+          {
+            "name": "ipconfig1",
+            "properties": {
+              "privateIPAllocationMethod": "Dynamic",
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}{1}', variables('publicIPAddressNamePrefix'), range(1, 1)[copyIndex()]))]"
+              },
+              "subnet": {
+                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vNetName'), variables('vNetSubnetName'))]"
+              }
+              //"loadbalancerbackendaddresspools": [
+              //  {
+              //    "id": "[concat(variables('loadbalancerid'), '/backendaddresspools/backendpool1')]"
+              //  }
+              //],
+              //"applicationgatewaybackendaddresspools": [
+              //  {
+              //    "id": "[resourceid('microsoft.network/applicationgateways/backendaddresspools', variables('applicationgatewayname'), variables('applicationgatewaybackendpool'))]"
+              //  }
+              //]
+            }
+          }
+        ]
+      }
+    },
+    //{
+    //  "copy": {
+    //    "name": "InstallWebServer_collection",
+    //    "count": "[length(range(0, 1))]"
+    //  },
+    //  "type": "Microsoft.Compute/virtualMachines/extensions",
+    //  "apiVersion": "2021-11-01",
+    //  "name": "[format('{0}{1}/InstallWebServer', variables('vmNamePrefix'), add(range(0, 1)[copyIndex()], 1))]",
+    //  "location": "[resourceGroup().location]",
+    //  "properties": {
+    //    "publisher": "Microsoft.Compute",
+    //    "type": "CustomScriptExtension",
+    //    "typeHandlerVersion": "1.7",
+    //    "autoUpgradeMinorVersion": true,
+    //    "settings": {
+    //      "commandToExecute": "powershell.exe Install-WindowsFeature -name Web-Server -IncludeManagementTools && powershell.exe remove-item 'C:\\inetpub\\wwwroot\\iisstart.htm' && powershell.exe Add-Content -Path 'C:\\inetpub\\wwwroot\\iisstart.htm' -Value $('Hello World from ' + $env:computername)"
+    //    }
+    //  },
+    //  "dependsOn": [
+    //    "virtualMachines_collection"
+    //  ]
+    //},
+    {
+      "apiVersion": "2021-08-01",
+      "type": "Microsoft.Network/loadBalancers",
+      "name": "[variables('loadBalancerNamePrefix')]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "LoadBalancer"
+      },
+      "sku": {
+        "name": "[variables('SkuName')]"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Network/publicIPAddresses', variables('lbPublicIpAddressNamePrefix'))]"
+      ],
+      "properties": {
+        "frontendIPConfigurations": [
+          {
+            "properties": {
+              "publicIPAddress": {
+                "id": "[resourceId('Microsoft.Network/publicIPAddresses', variables('lbPublicIpAddressNamePrefix'))]"
+              }
+            },
+            "name": "LoadBalancerFrontend"
+          }
+        ],
+        "backendAddressPools": [
+          {
+            "name": "BackendPool1"
+          }
+        ],
+        "loadBalancingRules": [
+          {
+            "properties": {
+              "frontendIPConfiguration": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerNamePrefix')), '/frontendIPConfigurations/LoadBalancerFrontend')]"
+              },
+              "backendAddressPool": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerNamePrefix')), '/backendAddressPools/BackendPool1')]"
+              },
+              "probe": {
+                "id": "[concat(resourceId('Microsoft.Network/loadBalancers', variables('loadBalancerNamePrefix')), '/probes/lbprobe')]"
+              },
+              "protocol": "Tcp",
+              "frontendPort": 80,
+              "backendPort": 80,
+              "idleTimeoutInMinutes": 15
+            },
+            "name": "lbrule"
+          }
+        ],
+        "probes": [
+          {
+            "properties": {
+              "protocol": "Tcp",
+              "port": 80,
+              "intervalInSeconds": 15,
+              "numberOfProbes": 2
+            },
+            "name": "lbprobe"
+          }
+        ]
+      }
+    },
+    {
+      "type": "Microsoft.Network/publicIPAddresses",
+      "apiVersion": "2021-08-01",
+      "name": "[variables('lbPublicIpAddressNamePrefix')]",
+      "location": "[resourceGroup().location]",
+      "sku": {
+        "name": "[variables('SkuName')]"
+      },
+      "properties": {
+        "publicIPAddressVersion": "IPv4",
+        "publicIPAllocationMethod": "Static",
+        "dnsSettings": {
+          "domainNameLabel": "[toLower(format('{0}{1}', format('{0}Vm', parameters('projectName')), uniqueString(resourceGroup().id)))]"
+        }
+      }
+    },
+    //{
+    //  "type": "Microsoft.Network/publicIPAddresses",
+    //  "apiVersion": "2021-08-01",
+    //  "name": "[variables('AGPublicIpAddressNamePrefix')]",
+    //  "location": "[resourceGroup().location]",
+    //  "sku": {
+    //    "name": "[variables('SkuName')]"
+    //  },
+    //  "properties": {
+    //    "publicIPAddressVersion": "IPv4",
+    //    "publicIPAllocationMethod": "Static",
+    //    "dnsSettings": {
+    //      "domainNameLabel": "[toLower(format('{0}{1}', format('{0}AG', parameters('projectName')), uniqueString(resourceGroup().id)))]"
+    //    }
+    //  }
+    //},
+    {
+      "copy": {
+        "name": "virtualMachines_collection",
+        "count": "[length(range(1, 1))]"
+      },
+      "apiVersion": "2015-06-15",
+      "type": "Microsoft.Compute/virtualMachines",
+      "name": "[format('{0}{1}', variables('vmNamePrefix'), range(1, 1)[copyIndex()])]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "VirtualMachines"
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Storage/storageAccounts/', variables('vhdStorageAccountName'))]",
+        "[resourceId('Microsoft.Network/networkInterfaces', format('{0}{1}', variables('networkInterfaceNamePrefix'), range(1, 1)[copyIndex()]))]"
+      ],
+      "properties": {
+        "hardwareProfile": {
+          "vmSize": "[parameters('vmSize')]"
+        },
+        "osProfile": {
+          "computerName": "[format('{0}-vm{1}', parameters('projectName'), range(1, 1)[copyIndex()])]",
+          "adminUsername": "[parameters('adminUsername')]",
+          "adminPassword": "[parameters('adminPassword')]"
+        },
+        "storageProfile": {
+          "imageReference": {
+            "publisher": "[variables('imagePublisher')]",
+            "offer": "[variables('imageOffer')]",
+            "sku": "[parameters('imageSKU')]",
+            "version": "latest"
+          },
+          "osDisk": {
+            "name": "osdisk",
+            "vhd": {
+              "uri": "[concat(reference(resourceId('Microsoft.Storage/storageAccounts', variables('vhdStorageAccountName')), '2016-01-01').primaryEndpoints.blob, 'vhds/osdisk', copyindex(), '.vhd')]"
+            },
+            "caching": "ReadWrite",
+            "createOption": "FromImage"
+          }
+        },
+        "networkProfile": {
+          "networkInterfaces": [
+            {
+              "id": "[resourceId('Microsoft.Network/networkInterfaces', format('{0}{1}', variables('networkInterfaceNamePrefix'), range(1, 1)[copyIndex()]))]"
+            }
+          ]
+        },
+        "diagnosticsProfile": {
+          "bootDiagnostics": {
+            "enabled": true,
+            "storageUri": "[reference(resourceId('Microsoft.Storage/storageAccounts', variables('vhdStorageAccountName')), '2016-01-01').primaryEndpoints.blob]"
+          }
+        }
+      },
+      "resources": [
+
+      ]
+    },
+    {
+      "copy": {
+        "name": "publicIPAddresses_collection",
+        "count": "[length(range(0, 1))]"
+      },
+      "apiVersion": "2021-08-01",
+      "type": "Microsoft.Network/publicIPAddresses",
+      "name": "[format('{0}{1}', variables('publicIPAddressNamePrefix'), range(1, 1)[copyIndex()])]",
+      "location": "[resourceGroup().location]",
+      "tags": {
+        "displayName": "PublicIPAddress"
+      },
+      "sku": {
+        "name": "[variables('SkuName')]"
+      },
+      "properties": {
+        "publicIPAllocationMethod": "[variables('publicIPAddressType')]"
+      }
+    }
+    //{
+    //  "type": "Microsoft.Network/routeTables",
+    //  "apiVersion": "2022-05-01",
+    //  "name": "[variables('routeTableNamePrefix')]",
+    //  "location": "[resourceGroup().location]",
+    //  "properties": {
+    //    "disableBgpRoutePropagation": false,
+    //    "routes": [
+    //      {
+    //        "name": "[variables('routeName')]",
+    //        "id": "[resourceId('Microsoft.Network/routeTables/routes', variables('routeTableNamePrefix'), variables('routeName'))]",
+    //        "properties": {
+    //          "addressPrefix": "10.2.0.0/16",
+    //          "nextHopType": "VnetLocal",
+    //          "hasBgpOverride": false
+    //        },
+    //        "type": "Microsoft.Network/routeTables/routes"
+    //      }
+    //    ]
+    //  }
+    //},
+    //{
+    //  "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+    //  "apiVersion": "2022-05-01",
+    //  "name": "[concat(variables('vNetName'), '/',variables('vNetPeeringOneTwo'))]",
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Network/virtualNetworks', variables('vNetName'))]"
+    //  ],
+    //  "properties": {
+    //    "remoteVirtualNetwork": {
+    //      "id": "[concat(resourceId('Microsoft.Network/virtualNetworks', variables('vNetName2')))]"
+    //    },
+    //    "allowVirtualNetworkAccess": true,
+    //    "allowForwardedTraffic": true,
+    //    "allowGatewayTransit": false,
+    //    "useRemoteGateways": false,
+    //    "doNotVerifyRemoteGateways": false,
+    //    "remoteAddressSpace": {
+    //      "addressPrefixes": [
+    //        "10.2.0.0/16"
+    //      ]
+    //    },
+    //    "remoteVirtualNetworkAddressSpace": {
+    //      "addressPrefixes": [
+    //        "10.2.0.0/16"
+    //      ]
+    //    }
+    //  }
+    //},
+    //{
+    //  "type": "Microsoft.Network/virtualNetworks/virtualNetworkPeerings",
+    //  "apiVersion": "2022-05-01",
+    //  "name": "[concat(variables('vNetName2'), '/',variables('vNetPeeringTwoOne'))]",
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Network/virtualNetworks', variables('vNetName2'))]"
+    //  ],
+    //  "properties": {
+    //    "remoteVirtualNetwork": {
+    //      "id": "[concat(resourceId('Microsoft.Network/virtualNetworks', variables('vNetName')))]"
+    //    },
+    //    "allowVirtualNetworkAccess": true,
+    //    "allowForwardedTraffic": true,
+    //    "allowGatewayTransit": false,
+    //    "useRemoteGateways": false,
+    //    "doNotVerifyRemoteGateways": false,
+    //    "remoteAddressSpace": {
+    //      "addressPrefixes": [
+    //        "10.0.0.0/16"
+    //      ]
+    //    },
+    //    "remoteVirtualNetworkAddressSpace": {
+    //      "addressPrefixes": [
+    //        "10.0.0.0/16"
+    //      ]
+    //    }
+    //  }
+    //},
+    //{
+    //  "type": "Microsoft.Network/trafficManagerProfiles",
+    //  "apiVersion": "2018-04-01",
+    //  "name": "[variables('TrafficManagerNamePrefix')]",
+    //  "location": "global",
+    //  "properties": {
+    //    "profileStatus": "Enabled",
+    //    "trafficRoutingMethod": "Priority",
+    //    "dnsConfig": {
+    //      "relativeName": "[variables('TrafficManagerDnsPrefix')]",
+    //      "ttl": 60
+    //    },
+    //    "monitorConfig": {
+    //      "profileMonitorStatus": "Degraded",
+    //      "protocol": "HTTP",
+    //      "port": 80,
+    //      "path": "/",
+    //      "intervalInSeconds": 30,
+    //      "toleratedNumberOfFailures": 3,
+    //      "timeoutInSeconds": 10
+    //    },
+    //    "endpoints": [
+    //      {
+    //        "name": "Priority1",
+    //        "type": "Microsoft.Network/TrafficManagerProfiles/ExternalEndpoints",
+    //        "properties": {
+    //          "endpointStatus": "Enabled",
+    //          "target": "sogetivmls6rxb7qzmo3c.northeurope.cloudapp.azure.com",
+    //          "weight": 1,
+    //          "priority": 1,
+    //          "endpointLocation": "North Europe"
+    //        }
+    //      },
+    //      {
+    //        "name": "Priority2",
+    //        "type": "Microsoft.Network/TrafficManagerProfiles/ExternalEndpoints",
+    //        "properties": {
+    //          "endpointStatus": "Enabled",
+    //          "target": "capgeminivmx3kdkk674lfqm1.westeurope.cloudapp.azure.com",
+    //          "weight": 1,
+    //          "priority": 2,
+    //          "endpointLocation": "West Europe"
+    //        }
+    //      }
+    //    ],
+    //    "trafficViewEnrollmentStatus": "Disabled",
+    //    "maxReturn": 0
+    //  }
+    //},
+    //{
+    //  "type": "Microsoft.Network/applicationGateways",
+    //  "apiVersion": "2021-05-01",
+    //  "name": "[variables('applicationGateWayName')]",
+    //  "location": "[resourceGroup().location]",
+    //  "properties": {
+    //    "sku": {
+    //      "name": "Standard_v2",
+    //      "tier": "Standard_v2"
+    //    },
+    //    "gatewayIPConfigurations": [
+    //      {
+    //        "name": "[variables('applicationGateWayIPConfigName')]",
+    //        "properties": {
+    //          "subnet": {
+    //            "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', variables('vNetName'), variables('vNetAGSubnetName'))]"
+    //          }
+    //        }
+    //      }
+    //    ],
+    //    "frontendIPConfigurations": [
+    //      {
+    //        "name": "[variables('applicationGatewayPublicFrontendIp')]",
+    //        "properties": {
+    //          "privateIPAllocationMethod": "Dynamic",
+    //          "publicIPAddress": {
+    //            "id": "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}', variables('AGPublicIpAddressNamePrefix')))]"
+    //          }
+    //        }
+    //      }
+    //    ],
+    //    "frontendPorts": [
+    //      {
+    //        "name": "[variables('applicationGateWayPort_80')]",
+    //        "properties": {
+    //          "port": 80
+    //        }
+    //      }
+    //    ],
+    //    "backendAddressPools": [
+    //      {
+    //        "name": "[variables('applicationGateWayBackendPool')]",
+    //        "properties": {}
+    //      }
+    //    ],
+    //    "backendHttpSettingsCollection": [
+    //      {
+    //        "name": "[variables('applicationGateWayHttpSetting')]",
+    //        "properties": {
+    //          "port": 80,
+    //          "protocol": "Http",
+    //          "cookieBasedAffinity": "Disabled",
+    //          "pickHostNameFromBackendAddress": false,
+    //          "requestTimeout": 20
+    //        }
+    //      }
+    //    ],
+    //    "httpListeners": [
+    //      {
+    //        "name": "[variables('applicationGateWayHttpListener')]",
+    //        "properties": {
+    //          "frontendIPConfiguration": {
+    //            "id": "[resourceId('Microsoft.Network/applicationGateways/frontendIPConfigurations', variables('applicationGateWayName'), variables('applicationGatewayPublicFrontendIp'))]"
+    //          },
+    //          "frontendPort": {
+    //            "id": "[resourceId('Microsoft.Network/applicationGateways/frontendPorts', variables('applicationGateWayName'), variables('applicationGateWayPort_80'))]"
+    //          },
+    //          "protocol": "Http",
+    //          "requireServerNameIndication": false
+    //        }
+    //      }
+    //    ],
+    //    "requestRoutingRules": [
+    //      {
+    //        "name": "[variables('applicationGateWayRoutingRule')]",
+    //        "properties": {
+    //          "ruleType": "Basic",
+    //          "httpListener": {
+    //            "id": "[resourceId('Microsoft.Network/applicationGateways/httpListeners', variables('applicationGateWayName'), variables('applicationGateWayHttpListener'))]"
+    //          },
+    //          "backendAddressPool": {
+    //            "id": "[resourceId('Microsoft.Network/applicationGateways/backendAddressPools', variables('applicationGateWayName'), variables('applicationGateWayBackendPool'))]"
+    //          },
+    //          "backendHttpSettings": {
+    //            "id": "[resourceId('Microsoft.Network/applicationGateways/backendHttpSettingsCollection', variables('applicationGateWayName'), variables('applicationGateWayHttpSetting'))]"
+    //          }
+    //        }
+    //      }
+    //    ],
+    //    "enableHttp2": false,
+    //    "autoscaleConfiguration": {
+    //      "minCapacity": 0,
+    //      "maxCapacity": 10
+    //    }
+    //  },
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Network/publicIPAddresses', format('{0}', variables('AGPublicIpAddressNamePrefix')))]",
+    //    "[resourceId('Microsoft.Network/virtualNetworks', variables('vNetName'))]"
+    //  ]
+    //},
+    //{
+    //  "type": "Microsoft.Web/serverfarms",
+    //  "apiVersion": "2021-02-01",
+    //  "name": "[variables('appServicePlanName')]",
+    //  "location": "[resourceGroup().location]",
+    //  "sku": {
+    //    "name": "S1"
+    //  },
+    //  "kind": "",
+    //  "properties": {
+    //    //if true-Linux, if false-Windows
+    //    "reserved": false
+    //  }
+    //},
+    //{
+    //  "type": "Microsoft.Web/sites",
+    //  "apiVersion": "2021-02-01",
+    //  "name": "[variables('appServiceWebAppName')]",
+    //  "location": "[resourceGroup().location]",
+    //  "properties": {
+    //    "httpsOnly": true,
+    //    "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+    //    "siteConfig": {
+    //      "AlwaysOn": true
+    //    }
+    //  },
+    //  "resources": [
+    //    //{
+    //    //  "apiVersion": "2020-12-01",
+    //    //  "name": "web",
+    //    //  "type": "sourcecontrols",
+    //    //  "dependsOn": [
+    //    //    "[resourceId('Microsoft.Web/Sites', variables('appServiceWebAppName'))]"
+    //    //  ],
+    //    //  "properties": {
+    //    //    "RepoUrl": "[variables('appServiceWebAppRepoUrl')]",
+    //    //    "branch": "master",
+    //    //    "IsManualIntegration": true
+    //    //  }
+    //    //},
+    //    {
+    //      "apiVersion": "2020-12-01",
+    //      "type": "config",
+    //      "name": "appsettings",
+    //      "dependsOn": [
+    //        "[resourceId('Microsoft.Web/Sites', variables('appServiceWebAppName'))]",
+    //        "[resourceId('Microsoft.Web/Sites', variables('appServiceWebApiName'))]"
+    //      ],
+    //      "properties": {
+    //        "WebApiUrl": "[concat('https://',variables('appServiceWebApiName'), '.azurewebsites.net')]",
+    //        "WEBSITE_WEBDEPLOY_USE_SCM": "false"
+    //      }
+    //    }
+    //  ],
+    //  "identity": {
+    //    "type": "SystemAssigned"
+    //  },
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]"
+    //  ]
+    //},
+    //{
+    //  "type": "Microsoft.Web/sites/slots",
+    //  "apiVersion": "2022-03-01",
+    //  "kind": "app",
+    //  "name": "[concat(variables('appServiceWebAppName'), '/test')]",
+    //  "location": "[resourceGroup().location]",
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Web/sites', variables('appServiceWebAppName'))]"
+    //  ],
+    //  "properties": {
+
+    //  }
+    //},
+    //{
+    //  "type": "Microsoft.Web/sites",
+    //  "kind": "api",
+    //  "name": "[variables('appServiceWebApiName')]",
+    //  "apiVersion": "2016-03-01",
+    //  "location": "[resourceGroup().location]",
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+    //    "[resourceId('Microsoft.Web/sites', variables('appServiceWebAppName'))]"
+    //  ],
+    //  "properties": {
+    //    "serverFarmId": "[resourceId('Microsoft.Web/serverfarms', variables('appServicePlanName'))]",
+    //    "siteConfig": {
+    //      "cors": {
+    //        //"allowedOrigins": [ "[variables('corsUrl')]" ],
+    //        "supportCredentials": false
+    //      }
+    //    },
+    //    "resources": [
+    //      //{
+    //      //  "apiVersion": "2016-03-01",
+    //      //  "name": "web",
+    //      //  "type": "sourcecontrols",
+    //      //  "dependsOn": [
+    //      //    "[resourceId('Microsoft.Web/Sites', variables('appServiceWebApiName'))]"
+    //      //  ],
+    //      //  "properties": {
+    //      //    "RepoUrl": "[variables('appServiceWebApiRepoUrl')]",
+    //      //    "branch": "master",
+    //      //    "IsManualIntegration": true
+    //      //  }
+    //      //},
+    //      {
+    //        "apiVersion": "2020-12-01",
+    //        "type": "config",
+    //        "name": "appsettings",
+    //        "dependsOn": [
+    //          "[resourceId('Microsoft.Web/Sites', variables('appServiceWebAppName'))]",
+    //          "[resourceId('Microsoft.Web/Sites', variables('appServiceWebApiName'))]"
+    //        ],
+    //        "properties": {
+    //          "WEBSITE_WEBDEPLOY_USE_SCM": "false"
+    //        }
+    //      }
+    //    ]
+    //  }
+    //}
+    //{
+    //  "type": "Microsoft.Sql/servers",
+    //  "apiVersion": "2022-05-01-preview",
+    //  "name": "[variables('SqlserverName')]",
+    //  "location": "[resourceGroup().location]",
+    //  "properties": {
+    //    "administratorLogin": "[variables('SqladministratorLogin')]",
+    //    "administratorLoginPassword": "[variables('SqladministratorPassword')]"
+    //  }
+    //},
+    //{
+    //  "type": "Microsoft.Sql/servers/databases",
+    //  "apiVersion": "2022-05-01-preview",
+    //  "name": "[variables('SqlDBName')]",
+    //  "location": "[resourceGroup().location]",
+    //  "sku": {
+    //    "name": "Standard",
+    //    "tier": "Standard"
+    //  },
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Sql/servers', variables('SqlserverName'))]"
+    //  ]
+    //},
+    //{
+    //  "type": "Microsoft.Sql/servers/firewallRules",
+    //  "apiVersion": "2022-05-01-preview",
+    //  "name": "[variables('SqlDBFirewallRule')]",
+    //  "properties": {
+    //    "endIpAddress": "103.160.194.199",
+    //    "startIpAddress": "103.160.194.199"
+    //  },
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.Sql/servers', variables('SqlserverName'))]"
+    //  ]
+    //},
+    //{
+    //  "type": "Microsoft.DocumentDB/databaseAccounts",
+    //  "apiVersion": "2022-05-15",
+    //  "name": "[toLower(variables('CosmosaccountName'))]",
+    //  "location": "[resourceGroup().location]",
+    //  "properties": {
+    //    "enableFreeTier": true,
+    //    "databaseAccountOfferType": "Standard",
+    //    "consistencyPolicy": {
+    //      "defaultConsistencyLevel": "Session"
+    //    },
+    //    "locations": [
+    //      {
+    //        "locationName": "[resourceGroup().location]"
+    //      }
+    //    ]
+    //  }
+    //},
+    //{
+    //  "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases",
+    //  "apiVersion": "2022-05-15",
+    //  "name": "[variables('CosmosDatabaseName')]",
+    //  "properties": {
+    //    "resource": {
+    //      "id": "[variables('CosmosDBNamePrefix')]"
+    //    },
+    //    "options": {
+    //      "throughput": 1000
+    //    }
+    //  },
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.DocumentDB/databaseAccounts', variables('CosmosaccountName'))]"
+    //  ]
+    //},
+    //{
+    //  "type": "Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers",
+    //  "apiVersion": "2022-05-15",
+    //  "name": "[toLower(variables('CosmosContainerName'))]",
+    //  "properties": {
+    //    "resource": {
+    //      "id": "[variables('CosmosContainerNamePrefix')]",
+    //      "partitionKey": {
+    //        "paths": [
+    //          "/myPartitionKey"
+    //        ],
+    //        "kind": "Hash"
+    //      },
+    //      "indexingPolicy": {
+    //        "indexingMode": "consistent",
+    //        "includedPaths": [
+    //          {
+    //            "path": "/*"
+    //          }
+    //        ],
+    //        "excludedPaths": [
+    //          {
+    //            "path": "/_etag/?"
+    //          }
+    //        ]
+    //      }
+    //    }
+    //  },
+    //  "dependsOn": [
+    //    "[resourceId('Microsoft.DocumentDB/databaseAccounts/sqlDatabases',variables('CosmosaccountName'), variables('CosmosDBNamePrefix'))]"
+    //  ]
+    //}
+  ]
+}
